@@ -1,19 +1,32 @@
 package routers
 
-import "github.com/labstack/echo/v4"
+import (
+	"Irlandesee/GO-Fuels/src/utils/dbHandlers"
 
-func RegisterRoutes(e *echo.Echo) {
+	"github.com/labstack/echo/v4"
+)
+
+func RegisterRoutes(e *echo.Echo, dbHandler *dbHandlers.Handler) {
+	// Create handlers
+	fuelHandler := NewFuelHandler(dbHandler)
+	locationHandler := NewLocationHandler(dbHandler)
+	userHandler := NewUserHandler(dbHandler)
+	brandHandler := NewBrandHandler(dbHandler)
+
+	// Create route groups
 	fuelsGroup := e.Group("/fuels")
 	locationGroup := e.Group("/location")
 	userGroup := e.Group("/user")
 	brandGroup := e.Group("/brand")
-	RegisterFuelRoutes(e, fuelsGroup)
-	RegisterLocationRoutes(e, locationGroup)
-	RegisterUserRoutes(e, userGroup)
-	RegisterBrandRoutes(e, brandGroup)
+
+	// Register routes
+	RegisterFuelRoutes(fuelsGroup, fuelHandler)
+	RegisterLocationRoutes(locationGroup, locationHandler)
+	RegisterUserRoutes(userGroup, userHandler)
+	RegisterBrandRoutes(brandGroup, brandHandler)
 }
 
-func RegisterFuelRoutes(e *echo.Echo, g *echo.Group, h *Handler) {
+func RegisterFuelRoutes(g *echo.Group, h *FuelHandler) {
 	// Fuel Types (MongoDB)
 	g.POST("/types", h.CreateFuelType)
 	g.GET("/types", h.GetAllFuelTypes)
@@ -31,7 +44,7 @@ func RegisterFuelRoutes(e *echo.Echo, g *echo.Group, h *Handler) {
 	g.PATCH("/data/price", h.UpdateFuelPrice)
 }
 
-func RegisterLocationRoutes(e *echo.Echo, g *echo.Group, h *Handler) {
+func RegisterLocationRoutes(g *echo.Group, h *LocationHandler) {
 	g.POST("", h.CreateLocation)
 	g.GET("/:location_key", h.GetLocationByKey)
 	g.PUT("/:location_key", h.UpdateLocation)
@@ -43,13 +56,13 @@ func RegisterLocationRoutes(e *echo.Echo, g *echo.Group, h *Handler) {
 	g.GET("/nearby/prices", h.GetNearbyLocationsWithPrices)
 }
 
-func RegisterUserRoutes(e *echo.Echo, g *echo.Group, h *Handler) {
+func RegisterUserRoutes(g *echo.Group, h *UserHandler) {
 	g.POST("/preferences", h.CreateUserPreference)
 	g.GET("/preferences/:user_id", h.GetUserPreference)
 	g.PUT("/preferences/:user_id", h.UpdateUserPreference)
 }
 
-func RegisterBrandRoutes(e *echo.Echo, g *echo.Group, h *Handler) {
+func RegisterBrandRoutes(g *echo.Group, h *BrandHandler) {
 	g.POST("", h.CreateBrand)
 	g.GET("/:brand_key", h.GetBrandByKey)
 	g.GET("", h.GetAllBrands)
