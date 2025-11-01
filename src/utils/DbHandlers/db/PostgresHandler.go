@@ -1,6 +1,7 @@
-package database
+package db
 
 import (
+	"Irlandesee/GO-Fuels/src/models"
 	"fmt"
 	"os"
 
@@ -8,11 +9,23 @@ import (
 	"gorm.io/gorm"
 )
 
+type PostgresHandler struct {
+	DB *gorm.DB
+}
+
+func (h *PostgresHandler) Close() error {
+	sqlDB, err := h.DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
+}
+
 func Migrate(db *gorm.DB) {
 
 }
 
-func DatabaseInit() (db *gorm.DB) {
+func NewPostgresHandler() (db *gorm.DB) {
 	dsn := fmt.Sprintf("host=%s, port=%s, user=%s, database=%s, password=%s",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_PORT"),
@@ -25,7 +38,10 @@ func DatabaseInit() (db *gorm.DB) {
 	if err != nil {
 		panic("Failed to connect to database")
 	}
-	db.AutoMigrate()
+	err = db.AutoMigrate(models.FuelData{})
+	if err != nil {
+		panic(err)
+	}
 
 	return db
 }
