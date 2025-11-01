@@ -1,7 +1,7 @@
-package DbHandlers
+package dbHandlers
 
 import(
-	"github.com/Irlandesee/GO-Fuels/src/util/DbHandlers/db"
+	"github.com/Irlandesee/GO-Fuels/src/utils/dbHandlers/db"
 )
 
 type Handler interface {
