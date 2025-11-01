@@ -1,9 +1,8 @@
 package db
 
 import (
-	"Irlandesee/GO-Fuels/src/models"
+	"database/sql"
 	"fmt"
-	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -21,27 +20,27 @@ func (h *PostgresHandler) Close() error {
 	return sqlDB.Close()
 }
 
-func Migrate(db *gorm.DB) {
-
-}
-
-func NewPostgresHandler() (db *gorm.DB) {
-	dsn := fmt.Sprintf("host=%s, port=%s, user=%s, database=%s, password=%s",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_DATABASE"),
-		os.Getenv("DB_PASSWORD"),
+func NewPostgresHandler(host, port, dbName, user, password string) (*PostgresHandler, error) {
+	connectionStr := fmt.Sprintf(
+		"host=%s user=%s dbname=%s port=%s password=%s sslmode=disable",
+		host, user, dbName, port, password,
 	)
-	var err error
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	db, err := sql.Open("postgres", connectionStr)
 	if err != nil {
-		panic("Failed to connect to database")
-	}
-	err = db.AutoMigrate(models.FuelData{})
-	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to open postgres connection: %w", err)
 	}
 
-	return db
+	// Test connection
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping postgres db: %w", err)
+	}
+
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: db}),
+		&gorm.Config{TranslateError: true, PrepareStmt: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize GORM: %w", err)
+	}
+
+	return &PostgresHandler{DB: gormDB}, nil
 }
