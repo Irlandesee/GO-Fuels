@@ -1,0 +1,50 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongo_db_go_fuels
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: go_fuels
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - mongodb_network
+  postgres:
+    image: postgres:latest
+    container_name: fuels_db
+    restart: unless-stopped
+    ports:
+      - "9999:5432"
+    environment:
+      POSTGRES_USER: go_fuels
+      POSTGRES_PASSWORD: go_fuels
+      POSTGRES_DB: go_fuels
+    volumes:
+      - ${PWD}/../db-data/:/var/lib/postgresql/data/
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-go-fuels
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # management ui port
+    environment:
+      RABBITMQ_DEFAULT_USER: monitoring
+      RABBITMQ_DEFAULT_PASS: go_fuels_pass
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - rabbitmq_network
+volumes:
+  mongodb_data:
+  mongodb_config:
+  rabbitmq_data:
+networks:
+  mongodb_network:
+    driver: bridge
+  rabbitmq_network:
+    driver: bridge
