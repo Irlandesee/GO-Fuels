@@ -90,16 +90,25 @@ func (h *LocationHandler) GetNearbyLocations(c echo.Context) error {
 	return c.JSON(http.StatusOK, locations)
 }
 
+// GetLocationWithPrices fetches the location from Mongo, then enriches it
+// with current prices from Postgres — the correct pattern for cross-DB queries.
 func (h *LocationHandler) GetLocationWithPrices(c echo.Context) error {
 	locationKey := c.Param("location_key")
 
-	//TODO: handle cross db query
-	result, err := h.DB.Mongo.GetLocationWithPrices(c.Request().Context(), locationKey)
+	// 1. Fetch location metadata from MongoDB
+	partial, err := h.DB.Mongo.GetLocationWithPrices(c.Request().Context(), locationKey)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, result)
+	// 2. Enrich with prices from PostgreSQL
+	prices, err := h.DB.Postgres.GetFuelDataByLocation(c.Request().Context(), locationKey)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	partial.Prices = prices
+
+	return c.JSON(http.StatusOK, partial)
 }
 
 type NearbyLocationsWithPricesRequest struct {
@@ -109,20 +118,49 @@ type NearbyLocationsWithPricesRequest struct {
 	FuelKey string  `query:"fuel_key" validate:"required"`
 }
 
+// GetNearbyLocationsWithPrices fetches nearby locations, then enriches each
+// with its current fuel prices from Postgres.
 func (h *LocationHandler) GetNearbyLocationsWithPrices(c echo.Context) error {
 	var req NearbyLocationsWithPricesRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid query parameters"})
 	}
-
 	if req.Radius <= 0 {
-		req.Radius = 5.0 // Default radius: 5km
+		req.Radius = 5.0
 	}
 
-	result, err := h.DB.Mongo.GetNearbyLocationsWithPrices(c.Request().Context(), req.Lat, req.Lng, req.Radius, req.FuelKey)
+	// 1. Fetch nearby locations from MongoDB
+	partials, err := h.DB.Mongo.GetNearbyLocationsWithPrices(
+		c.Request().Context(), req.Lat, req.Lng, req.Radius, req.FuelKey,
+	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, result)
+	// 2. Enrich each location with Postgres prices, filtered by fuel_key
+	for i := range partials {
+		locationKey := partials[i].Location.LocationKey
+		var prices []models.FuelData
+		var pgErr error
+
+		if req.FuelKey != "" {
+			fd, e := h.DB.Postgres.GetFuelDataByLocationAndFuel(
+				c.Request().Context(), locationKey, req.FuelKey,
+			)
+			if e == nil {
+				prices = []models.FuelData{*fd}
+			} else {
+				pgErr = e
+			}
+		} else {
+			prices, pgErr = h.DB.Postgres.GetFuelDataByLocation(c.Request().Context(), locationKey)
+		}
+
+		if pgErr == nil {
+			partials[i].Prices = prices
+		}
+		// If Postgres lookup fails for one location, continue — don't abort the whole response
+	}
+
+	return c.JSON(http.StatusOK, partials)
 }

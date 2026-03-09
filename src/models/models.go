@@ -67,14 +67,17 @@ type FuelType struct {
 // FuelData represents the price data stored in PostgreSQL
 // Uses string keys to reference MongoDB collections
 type FuelData struct {
-	gorm.Model
-	FuelKey      string    `gorm:"type:varchar(100);not null;index" json:"fuel_key"`     // References FuelType.fuel_key in MongoDB
-	FuelCategory string    `gorm:"type:varchar(50);not null;index" json:"fuel_category"` // References FuelType.fuel_category in MongoDB
-	Price        float64   `gorm:"type:decimal(10,3);not null" json:"price"`             // Current price
-	LocationKey  string    `gorm:"type:varchar(100);not null;index" json:"location_key"` // References Location.location_key in MongoDB
-	LastUpdate   time.Time `gorm:"type:timestamp;not null;index" json:"last_update"`     // When price was last updated
-	Currency     string    `gorm:"type:varchar(3);default:'EUR'" json:"currency"`        // e.g., "EUR", "USD"
-	IsActive     bool      `gorm:"default:true;index" json:"is_active"`                  // Soft delete flag
+	ID           uint      `gorm:"primaryKey"`
+	FuelKey      string    `gorm:"type:varchar(100);not null;index" json:"fuel_key"`      // References FuelType.fuel_key in MongoDB
+	FuelCategory string    `gorm:"type:varchar(50);not null;index" json:"fuel_category"`  // References FuelType.fuel_category in MongoDB
+	Price        float64   `gorm:"type:decimal(10,3);not null" json:"price"`              // Current price
+	LocationKey  string    `gorm:"type:varchar(100);not null;index" json:"location_key"`  // References Location.location_key in MongoDB
+	LastUpdate   time.Time `gorm:"primaryKey;type:timestamp;not null" json:"last_update"` // When price was last updated (Primary Key for TimescaleDB)
+	Currency     string    `gorm:"type:varchar(3);default:'EUR'" json:"currency"`         // e.g., "EUR", "USD"
+	IsActive     bool      `gorm:"default:true;index" json:"is_active"`                   // Soft delete flag
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    gorm.DeletedAt `gorm:"index"`
 }
 
 const (
