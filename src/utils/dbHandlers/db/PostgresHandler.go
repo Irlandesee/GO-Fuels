@@ -36,8 +36,8 @@ func NewPostgresHandler(host, port, dbName, user, password string) (*PostgresHan
 		return nil, fmt.Errorf("failed to initialize GORM with postgres driver: %w", err)
 	}
 
-	// Auto-migrate the FuelData model
-	if err := gormDB.AutoMigrate(&models.FuelData{}); err != nil {
+	// Auto-migrate models
+	if err := gormDB.AutoMigrate(&models.FuelData{}, &models.IngestionJob{}); err != nil {
 		return nil, fmt.Errorf("failed to migrate schema: %w", err)
 	}
 
@@ -146,4 +146,46 @@ func (h *PostgresHandler) UpdateFuelPrice(ctx context.Context, locationKey, fuel
 		return fmt.Errorf("no fuel data found for location_key=%s fuel_key=%s", locationKey, fuelKey)
 	}
 	return nil
+}
+
+// ─── Ingestion Jobs ──────────────────────────────────────────────────────────
+
+func (h *PostgresHandler) CreateIngestionJob(ctx context.Context, job *models.IngestionJob) error {
+	job.Status = models.JobStatusStart
+	return h.DB.WithContext(ctx).Create(job).Error
+}
+
+func (h *PostgresHandler) GetIngestionJob(ctx context.Context, jobID uint) (*models.IngestionJob, error) {
+	var job models.IngestionJob
+	err := h.DB.WithContext(ctx).First(&job, jobID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (h *PostgresHandler) UpdateIngestionJobStatus(ctx context.Context, jobID uint, status models.JobStatus, errMsg string, records int) error {
+	updates := map[string]interface{}{
+		"status": status,
+	}
+
+	now := time.Now()
+	switch status {
+	case models.JobStatusRunning:
+		updates["started_at"] = now
+	case models.JobStatusDone, models.JobStatusFailed:
+		updates["ended_at"] = now
+		updates["records"] = records
+		if errMsg != "" {
+			updates["error"] = errMsg
+		}
+	}
+
+	return h.DB.WithContext(ctx).Model(&models.IngestionJob{}).Where("id = ?", jobID).Updates(updates).Error
+}
+
+func (h *PostgresHandler) ListIngestionJobs(ctx context.Context, limit, offset int) ([]models.IngestionJob, error) {
+	var jobs []models.IngestionJob
+	err := h.DB.WithContext(ctx).Order("created_at DESC").Limit(limit).Offset(offset).Find(&jobs).Error
+	return jobs, err
 }

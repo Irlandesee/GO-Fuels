@@ -12,18 +12,21 @@ func RegisterRoutes(e *echo.Echo, dbHandler *dbHandlers.Handler) {
 	locationHandler := NewLocationHandler(dbHandler)
 	userHandler := NewUserHandler(dbHandler)
 	brandHandler := NewBrandHandler(dbHandler)
+	ingestionHandler := NewIngestionHandler(dbHandler)
 
 	// Create route groups
 	fuelsGroup := e.Group("/fuels")
 	locationGroup := e.Group("/location")
 	userGroup := e.Group("/user")
 	brandGroup := e.Group("/brand")
+	ingestionGroup := e.Group("/ingestion")
 
 	// Register routes
 	RegisterFuelRoutes(fuelsGroup, fuelHandler)
 	RegisterLocationRoutes(locationGroup, locationHandler)
 	RegisterUserRoutes(userGroup, userHandler)
 	RegisterBrandRoutes(brandGroup, brandHandler)
+	RegisterIngestionRoutes(ingestionGroup, ingestionHandler)
 }
 
 func RegisterFuelRoutes(g *echo.Group, h *FuelHandler) {
@@ -67,4 +70,10 @@ func RegisterBrandRoutes(g *echo.Group, h *BrandHandler) {
 	g.GET("/:brand_key", h.GetBrandByKey)
 	g.GET("", h.GetAllBrands)
 	g.PUT("/:brand_key", h.UpdateBrand)
+}
+
+func RegisterIngestionRoutes(g *echo.Group, h *IngestionHandler) {
+	g.POST("/jobs", h.CreateJob)
+	g.GET("/jobs/:id", h.GetJob)
+	g.GET("/jobs", h.ListJobs)
 }

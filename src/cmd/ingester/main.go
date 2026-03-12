@@ -41,10 +41,11 @@ func main() {
 	log.Printf("Starting ingestion for lat: %f, lng: %f, radius: %d", lat, lng, radius)
 
 	// Esecuzione dell'ingestion
-	if err := fuelIngester.FetchAndIngest(ctx, lat, lng, radius); err != nil {
+	records, err := fuelIngester.FetchAndIngest(ctx, lat, lng, radius)
+	if err != nil {
 		log.Printf("Ingestion failed: %v", err)
 	} else {
-		log.Println("Ingestion completed successfully")
+		log.Printf("Ingestion completed successfully, %d records processed", records)
 	}
 
 	// Se si volesse far girare periodicamente:

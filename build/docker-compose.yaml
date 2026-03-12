@@ -28,12 +28,29 @@ services:
       - timescaledb_data:/var/lib/timescaledb/data
     networks:
       - timescaledb_network
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_fuels
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - rabbitmq_network
 volumes:
   mongodb_data:
   mongodb_config:
   timescaledb_data:
+  rabbitmq_data:
 networks:
   mongodb_network:
     driver: bridge
   timescaledb_network:
+    driver: bridge
+  rabbitmq_network:
     driver: bridge

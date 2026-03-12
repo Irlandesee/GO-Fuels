@@ -80,7 +80,39 @@ type FuelData struct {
 	DeletedAt    gorm.DeletedAt `gorm:"index"`
 }
 
+// JobStatus represents the state of an ingestion job
+type JobStatus string
+
 const (
+	JobStatusStart   JobStatus = "START"
+	JobStatusRunning JobStatus = "RUNNING"
+	JobStatusDone    JobStatus = "DONE"
+	JobStatusFailed  JobStatus = "FAILED"
+)
+
+// IngestionJob tracks the lifecycle of a fuel data ingestion job
+type IngestionJob struct {
+	ID        uint       `gorm:"primaryKey" json:"id"`
+	Status    JobStatus  `gorm:"type:varchar(20);not null;default:'START'" json:"status"`
+	Lat       float64    `gorm:"type:decimal(10,6);not null" json:"lat"`
+	Lng       float64    `gorm:"type:decimal(10,6);not null" json:"lng"`
+	Radius    int        `gorm:"not null" json:"radius"`
+	Error     string     `gorm:"type:text" json:"error,omitempty"`
+	Records   int        `gorm:"default:0" json:"records"`
+	StartedAt *time.Time `json:"started_at,omitempty"`
+	EndedAt   *time.Time `json:"ended_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+// IngestionJobMessage is the message published to RabbitMQ
+type IngestionJobMessage struct {
+	JobID uint `json:"job_id"`
+}
+
+const (
+	IngestionQueueName = "ingestion_jobs"
+
 	UserPreferencesCollection = "user_preferences"
 	LocationsCollection       = "locations"
 	BrandsCollection          = "brands"
