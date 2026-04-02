@@ -1,13 +1,11 @@
 package ingester
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"time"
+
+	"resty.dev/v3"
 
 	"Irlandesee/GO-Fuels/src/models"
 	"Irlandesee/GO-Fuels/src/utils/dbHandlers/db"
@@ -51,11 +49,23 @@ type FuelPrice struct {
 
 type Ingester struct {
 	dbHandler *db.PostgresHandler
+	client    *resty.Client
 }
 
 func NewIngester(dbHandler *db.PostgresHandler) *Ingester {
+	client := resty.New().
+		SetBaseURL("https://carburanti.mise.gov.it").
+		SetTimeout(30 * time.Second).
+		SetHeaders(map[string]string{
+			"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:148.0) Gecko/20100101 Firefox/148.0",
+			"Accept":     "application/json",
+			"Origin":     "https://carburanti.mise.gov.it",
+			"Referer":    "https://carburanti.mise.gov.it/ospzSearch/zona",
+		})
+
 	return &Ingester{
 		dbHandler: dbHandler,
+		client:    client,
 	}
 }
 
@@ -78,44 +88,24 @@ func (i *Ingester) ProcessJob(ctx context.Context, job *models.IngestionJob) {
 
 // FetchAndIngest calls the MISE API and upserts fuel data. Returns the number of records processed.
 func (i *Ingester) FetchAndIngest(ctx context.Context, lat, lng float64, radius int) (int, error) {
-	url := "https://carburanti.mise.gov.it/ospzApi/search/zone"
-
 	reqBody := SearchZoneRequest{
 		Points: []Point{{Lat: lat, Lng: lng}},
 		Radius: radius,
 	}
 
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal request: %w", err)
-	}
+	var apiResp SearchZoneResponse
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:148.0) Gecko/20100101 Firefox/148.0")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "https://carburanti.mise.gov.it")
-	req.Header.Set("Referer", "https://carburanti.mise.gov.it/ospzSearch/zona")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := i.client.R().
+		SetContext(ctx).
+		SetBody(reqBody).
+		SetResult(&apiResp).
+		Post("/ospzApi/search/zone")
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
-	}
-
-	var apiResp SearchZoneResponse
-	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
+	if resp.IsError() {
+		return 0, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode(), resp.String())
 	}
 
 	if !apiResp.Success {

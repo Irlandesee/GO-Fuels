@@ -39,7 +39,12 @@ func main() {
 		log.Fatalf("Failed to init RabbitMQ: %v", err)
 	}
 
-	defer handler.Close()
+	defer func(handler *dbHandlers.Handler) {
+		err := handler.Close()
+		if err != nil {
+			log.Fatalf("Failed to close DB handler: %v", err)
+		}
+	}(handler)
 
 	e := echo.New()
 	routers.RegisterRoutes(e, handler)
