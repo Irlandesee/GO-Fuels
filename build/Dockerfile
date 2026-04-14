@@ -1,4 +1,29 @@
-FROM ubuntu:latest
-LABEL authors="MattiaMauro.Lunardi"
+# ── Build stage ────────────────────────────────────────────────
+FROM golang:1.25-alpine AS builder
 
-ENTRYPOINT ["top", "-b"]
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Build API server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/api-server ./src/main.go
+
+# Build worker
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/worker ./src/cmd/worker/main.go
+
+# ── Runtime stage ─────────────────────────────────────────────
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /bin/api-server /usr/local/bin/api-server
+COPY --from=builder /bin/worker /usr/local/bin/worker
+
+EXPOSE 8080
+
+ENTRYPOINT ["api-server"]

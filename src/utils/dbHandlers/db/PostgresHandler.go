@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PostgresHandler struct {
@@ -61,21 +62,26 @@ func (h *PostgresHandler) CreateFuelData(ctx context.Context, fd *models.FuelDat
 	return h.DB.WithContext(ctx).Create(fd).Error
 }
 
-// UpsertFuelData updates the price if (location_key, fuel_key) already exists,
-// otherwise inserts a new row.
+// UpsertFuelData inserts a new fuel price row or updates an existing one.
+// Uses ON CONFLICT on the unique index (location_key, fuel_key, last_update)
+// for atomic, idempotent upserts — no precision issues with timestamp matching.
 func (h *PostgresHandler) UpsertFuelData(ctx context.Context, fd *models.FuelData) error {
-	fd.LastUpdate = time.Now()
+	if fd.LastUpdate.IsZero() {
+		fd.LastUpdate = time.Now()
+	}
 
 	return h.DB.WithContext(ctx).
-		Where(models.FuelData{LocationKey: fd.LocationKey, FuelKey: fd.FuelKey}).
-		Assign(models.FuelData{
-			Price:        fd.Price,
-			FuelCategory: fd.FuelCategory,
-			Currency:     fd.Currency,
-			IsActive:     fd.IsActive,
-			LastUpdate:   fd.LastUpdate,
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "location_key"},
+				{Name: "fuel_key"},
+				{Name: "last_update"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"price", "fuel_category", "currency", "is_active", "updated_at",
+			}),
 		}).
-		FirstOrCreate(fd).Error
+		Create(fd).Error
 }
 
 func (h *PostgresHandler) GetFuelDataByLocation(ctx context.Context, locationKey string) ([]models.FuelData, error) {

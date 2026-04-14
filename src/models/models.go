@@ -3,6 +3,8 @@ package models
 import (
 	"time"
 
+	"Irlandesee/GO-Fuels/src/utils"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gorm.io/gorm"
 )
@@ -68,11 +70,11 @@ type FuelType struct {
 // Uses string keys to reference MongoDB collections
 type FuelData struct {
 	ID           uint      `gorm:"primaryKey"`
-	FuelKey      string    `gorm:"type:varchar(100);not null;index" json:"fuel_key"`      // References FuelType.fuel_key in MongoDB
-	FuelCategory string    `gorm:"type:varchar(50);not null;index" json:"fuel_category"`  // References FuelType.fuel_category in MongoDB
-	Price        float64   `gorm:"type:decimal(10,3);not null" json:"price"`              // Current price
-	LocationKey  string    `gorm:"type:varchar(100);not null;index" json:"location_key"`  // References Location.location_key in MongoDB
-	LastUpdate   time.Time `gorm:"primaryKey;type:timestamp;not null" json:"last_update"` // When price was last updated (Primary Key for TimescaleDB)
+	FuelKey      string    `gorm:"type:varchar(100);not null;index;uniqueIndex:idx_fuel_location_time" json:"fuel_key"`
+	FuelCategory string    `gorm:"type:varchar(50);not null;index" json:"fuel_category"`
+	Price        float64   `gorm:"type:decimal(10,3);not null" json:"price"`
+	LocationKey  string    `gorm:"type:varchar(100);not null;index;uniqueIndex:idx_fuel_location_time" json:"location_key"`
+	LastUpdate   time.Time `gorm:"primaryKey;type:timestamp;not null;uniqueIndex:idx_fuel_location_time" json:"last_update"`
 	Currency     string    `gorm:"type:varchar(3);default:'EUR'" json:"currency"`         // e.g., "EUR", "USD"
 	IsActive     bool      `gorm:"default:true;index" json:"is_active"`                   // Soft delete flag
 	CreatedAt    time.Time
@@ -119,16 +121,14 @@ const (
 	FuelTypesCollection       = "fuel_types"
 )
 
-// GenerateFuelKey creates a consistent fuel key from category and type
-// Example: "gasoline_95", "diesel_premium", "electric_fast"
+// GenerateFuelKey creates a consistent fuel key from category and type.
+// Delegates to utils.GenerateFuelKey.
 func GenerateFuelKey(category, fuelType string) string {
-	//TODO
-	return "" // placeholder
+	return utils.GenerateFuelKey(category, fuelType)
 }
 
-// GenerateLocationKey creates a consistent location key
-// Example: "shell_main_street_123", "eni_highway_a1_km45"
+// GenerateLocationKey creates a consistent location key.
+// Delegates to utils.GenerateLocationKey.
 func GenerateLocationKey(brand, address string) string {
-	//TODO
-	return "" // placeholder
+	return utils.GenerateLocationKey(brand, address)
 }
